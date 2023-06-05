@@ -6,35 +6,40 @@ await sort('sorted_text');
 async function sort(outputFile) {
     const writeStream = createWriteStream(outputFile, { encoding: 'utf-8' });
     const linesCount = await countLines();
-    let lastMaximum = await getMax();
+    let ignoredLines = [];
+    let lastMaximum = await getMax(ignoredLines);
     for (let i = 0; i < linesCount; i++) {
         writeStream.write(lastMaximum + '\n');
-        lastMaximum = await getMax(lastMaximum);
+        lastMaximum = await getMax(ignoredLines, lastMaximum);
     }
 }
 
-async function getMax(lessThan) {
-    const rl = readline.createInterface({ input: createReadStream('text'), crlfDelay: Infinity })
+async function getMax(ignoredLines, lessThan) {
+    const rl = readline.createInterface({ input: createReadStream('text'), crlfDelay: Infinity });
     let currentMaximum = '';
-    const task = new Promise((resolve) => {
+    let currentLineNumber = 0;
+    let lastMaximumLineNumber = currentLineNumber;
+    await new Promise((resolve) => {
         rl.on('line', (line) => {
-            if ((line < lessThan || lessThan == undefined) && line > currentMaximum) currentMaximum = line;
+            currentLineNumber++;
+            if ((line <= lessThan || lessThan == undefined) && line > currentMaximum && !ignoredLines.includes(currentLineNumber)) {
+                currentMaximum = line;
+                lastMaximumLineNumber = currentLineNumber;
+            }
         });
-        rl.on('close', resolve)
-    })
-    await task;
+        rl.on('close', resolve);
+    });
+    ignoredLines.push(lastMaximumLineNumber);
     return currentMaximum;
 }
 
 async function countLines() {
-    const rl = readline.createInterface({ input: createReadStream('text'), crlfDelay: Infinity })
+    const rl = readline.createInterface({ input: createReadStream('text'), crlfDelay: Infinity });
     let linesCount = 0;
     const task = new Promise((resolve) => {
-        rl.on('line', (line) => {
-            linesCount++;
-        });
-        rl.on('close', resolve)
-    })
+        rl.on('line', () => { linesCount++; });
+        rl.on('close', resolve);
+    });
     await task;
     return linesCount;
 }
